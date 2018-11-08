@@ -107,7 +107,7 @@ def check_node_valid(node, map):
         return False
 
 
-def calc_g(node1, node2):
+def calc_dis(node1, node2):
     """
     计算两点间的G值
     :param node1: 被检测的点1
@@ -115,9 +115,9 @@ def calc_g(node1, node2):
     :param grid_map: 栅格地图
     :return: G（两点间的距离）
     """
-    g_value = sqrt((node1.x_pos - node2.x_pos)**2 + (node1.y_pos - node2.y_pos)**2)
+    dis_value = sqrt((node1.x_pos - node2.x_pos)**2 + (node1.y_pos - node2.y_pos)**2)
 
-    return g_value
+    return dis_value
 
 
 def calc_h(node, goal_node):
@@ -133,12 +133,22 @@ def calc_h(node, goal_node):
     return h_value
 
 
-def judge_in_openlist(node, openlist):
+def judge_in_list(node, openlist):
     """判断某个节点是否位于某个list"""
     for i in openlist:
         if node.x_pos == i.x_pos and node.y_pos == i.y_pos:
             return True
     return False
+
+
+def get_fmin(open_list):
+    f_min = 99999
+    fmin_node = None
+    for node in open_list:
+        if node.f_value < f_min:
+            f_min = node.f_value
+            fmin_node = node
+    return fmin_node
 
 
 def a_star(test_map, start_node=MapNode(0,0), goal_node=MapNode(90,90)):
@@ -158,61 +168,74 @@ def a_star(test_map, start_node=MapNode(0,0), goal_node=MapNode(90,90)):
     # 用于存储还未检测的节点
     open_list = set()
 
-    proc_node = start_node
+    start_node.g_value = 0
+    start_node.h_value = 0
+    start_node.f_value = 0
 
     # 检查要处理的node是否合法
-    if check_node_valid(proc_node, test_map) and check_node_valid(goal_node, test_map):
+    if check_node_valid(start_node, test_map) and check_node_valid(goal_node, test_map):
         # 将起始点插入open list
-        open_list.add(proc_node)
+        open_list.add(start_node)
 
     i = 0
 
-    while True:
+    while open_list:  # openlist为空，退出循环
         print i
         i = i+1
+        # 在openlist中选取F值最小的的节点作为新的待检测节点
+        proc_node = get_fmin(open_list)
+        open_list.remove(proc_node)
+        closed_list.add(proc_node)
 
         # 得到该点周围的可行节点
-        dirc_list = [[0, 1], [1, 1], [1, 0], [-1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+        # dirc_list = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+        dirc_list = [[0, 1], [1, 0], [0, -1],  [-1, 0]]  # 4个方向
 
         for dirc in dirc_list:
             node = MapNode(proc_node.x_pos+dirc[0], proc_node.y_pos+dirc[1])
 
-            # 如果节点在地图上，且不在障碍物内，且不在close list中， 则添加到open_list
+            # 如果节点在地图上，且不在障碍物内，且不在closed list中， 则添加到open_list
             if check_node_valid(node, test_map) and test_map_data[node.y_pos, node.x_pos] == 0 and not\
-                    judge_in_openlist(node, closed_list):
+                    judge_in_list(node, closed_list):
                 # 检查该节点是否在Openlist中，如果在，则检查是否该节点和当前处理节点之间的g值是否小于原g值
-                if judge_in_openlist(node, open_list):
+                if judge_in_list(node, open_list):
                     # 计算当前g值
-                    now_g_value = calc_g(node, proc_node)
+                    # now_g_value = proc_node.g_value + calc_dis(node, proc_node)
+                    now_g_value = proc_node.g_value + 1
                     # 若当前g值更小，证明从当前处理节点走代价更小，则将当前处理节点设为该节点父节点
                     if now_g_value < node.g_value:
                         node.parent_node = proc_node
+                        node.g_value = now_g_value  # 更新g值
                     else:
                         continue
                 # 如果节点不在openlist中
                 else:
                     # 则加入该节点，并设置当前处理节点为其父节点
                     node.parent_node = proc_node
+                    node.g_value = proc_node.g_value + 1
+                    node.h_value = calc_h(node, goal_node)
+                    node.f_value = node.g_value + node.h_value
                     open_list.add(node)
 
-        # 将原节点从open list中移除，添加到close list
-        open_list.remove(proc_node)
-        closed_list.add(proc_node)
+        # # 将原节点从open list中移除，添加到close list
+        # open_list.remove(proc_node)
+        # closed_list.add(proc_node)
 
-        # 在openlist中选取F值最小的的节点作为新的待检测节点
-        # F = G + H
-        f_min = 100000  # 初始化，用于存储和第一次比较
 
-        for node in open_list:
-            node.g_value = calc_g(proc_node, node)
-            node.h_value = calc_h(node, goal_node)
-            node.f_value = node.g_value + node.h_value
-            if node.f_value < f_min:
-                f_min = node.f_value
-                proc_node = node
+        # # F = G + H
+        # f_min = 100000  # 初始化，用于存储和第一次比较
+        #
+        # for node in open_list:
+        #     # node.g_value = proc_node.g_value + calc_dis(proc_node, node)
+        #     node.g_value = proc_node.g_value + 1
+        #     node.h_value = calc_h(node, goal_node)
+        #     node.f_value = node.g_value + node.h_value
+        #     if node.f_value < f_min:
+        #         f_min = node.f_value
+        #         proc_node = node
 
         # 判断此时目标节点是否位于openlist中，如果是，则设置goal_node的父节点为当前处理节点，退出循环
-        if judge_in_openlist(goal_node, open_list):
+        if judge_in_list(goal_node, open_list):
             goal_node.parent_node = proc_node
             break
 
@@ -245,7 +268,7 @@ if __name__ == '__main__':
     # 创建地图
     test_map = GridMap(300, 400, 1)
 
-    # 添加障碍物
+    # # 添加障碍物
     test_map.add_obstacle([23, 23], [60, 40])
 
     test_map.add_obstacle([30, 50], [120, 60])
@@ -256,6 +279,6 @@ if __name__ == '__main__':
 
     # 设置起始节点
     start_node = MapNode(2, 2)
-    goal_node = MapNode(250, 300)
+    goal_node = MapNode(200, 300)
 
     a_star(test_map, start_node, goal_node)
